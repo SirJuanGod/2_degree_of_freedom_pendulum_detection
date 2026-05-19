@@ -1,0 +1,64 @@
+<?xml version="1.0" ?>
+<mujoco model="pendulo_doble">
+
+  <compiler angle="radian" autolimits="false"/>
+  <option gravity="0 0 -9.81" timestep="0.002"/>
+
+  <visual>
+    <global offwidth="1280" offheight="720"/>
+  </visual>
+
+  <worldbody>
+
+    <!-- Cámara centrada: ve desde el frente, el péndulo mide ~0.8m total -->
+    <camera name="vista_frontal"
+            pos="0 -1.8 -0.4"
+            xyaxes="1 0 0 0 0 1"/>
+
+    <!-- Punto de anclaje ROJO (joint central, fijo al mundo) -->
+    <geom name="punto_rojo" type="sphere" size="0.03"
+          pos="0 0 0" rgba="1 0 0 1"
+          contype="0" conaffinity="0"/>
+
+    <!-- ── Barra 1 ── -->
+    <body name="barra1" pos="0 0 0">
+      <joint name="joint_central" type="hinge" axis="0 1 0"
+             pos="0 0 0" limited="false" damping="0.05"/>
+
+      <geom name="cilindro1" type="cylinder" size="0.012 0.2"
+            pos="0 0 -0.2" rgba="0.85 0.85 0.85 1"/>
+
+      <!-- Punto VERDE en el joint intermedio -->
+      <geom name="punto_verde" type="sphere" size="0.03"
+            pos="0 0 -0.4" rgba="0 0.85 0 1"
+            contype="0" conaffinity="0"/>
+
+      <inertial pos="0 0 -0.2" mass="1.0"
+                diaginertia="0.014 0.014 0.0002"/>
+
+      <!-- ── Barra 2 ── -->
+      <body name="barra2" pos="0 0 -0.4">
+        <joint name="joint_intermedio" type="hinge" axis="0 1 0"
+               pos="0 0 0" limited="false" damping="0.05"/>
+
+        <geom name="cilindro2" type="cylinder" size="0.012 0.2"
+              pos="0 0 -0.2" rgba="0.6 0.6 0.6 1"/>
+
+        <!-- Punto AZUL en el extremo final -->
+        <geom name="punto_azul" type="sphere" size="0.03"
+              pos="0 0 -0.4" rgba="0 0 1 1"
+              contype="0" conaffinity="0"/>
+
+        <inertial pos="0 0 -0.2" mass="0.5"
+                  diaginertia="0.007 0.007 0.0001"/>
+      </body>
+    </body>
+
+  </worldbody>
+
+  <!-- 90° = π/2 = 1.5708 rad en ambos joints -->
+  <keyframe>
+    <key name="inicio" qpos="1.5708 0.0"/>
+  </keyframe>
+
+</mujoco>

@@ -1,0 +1,9 @@
+{
+    "url": "https://cad.onshape.com/documents/50df8fe5fed17f7d2bb31614/w/dfb17eb74f41cf60494f9208/e/42dc8a690f23db7f3abfba36",
+    "output_format": "mujoco",
+    "output_filename": "pendulo",
+    "use_visual_meshes": true,
+    "use_collision_meshes": true,
+    "simplify_collision_meshes": true
+    
+}
