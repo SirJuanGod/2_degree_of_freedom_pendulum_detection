@@ -1,76 +1,98 @@
 """
-05_report.py — reporte final compatible con costo por energia+frecuencias
- + generación de PDF con modelo matemático
+05_report.py — reporte final con PDF de modelo matemático
+
+OPTIMIZACIONES:
+- Validación de archivos antes de procesarlos
+- Manejo de errores en importación de reportlab
+- Logging detallado
 """
 import numpy as np
 import yaml
 import matplotlib.pyplot as plt
 from pathlib import Path
+import warnings
+import sys
 
-# ---- NUEVO: imports para PDF ----
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.units import cm
-from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer,
-    Table, TableStyle, HRFlowable, Image as RLImage
-)
-from reportlab.lib.styles import ParagraphStyle
-from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
-from reportlab.lib import colors
-from reportlab.lib.colors import HexColor
-from io import BytesIO
-
+warnings.filterwarnings('ignore')
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT  = ROOT / "output"
 
+# Importar utilidades
+sys.path.insert(0, str(ROOT))
+from utils import setup_logging
 
-# ---- NUEVO: estilos y helpers PDF ----
+logger = setup_logging("report", OUT)
+
+# Importar dependencias de PDF con fallback
+try:
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import cm
+    from reportlab.platypus import (
+        SimpleDocTemplate, Paragraph, Spacer,
+        Table, TableStyle, HRFlowable, Image as RLImage
+    )
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
+    from reportlab.lib import colors
+    from reportlab.lib.colors import HexColor
+    from io import BytesIO
+    HAVE_REPORTLAB = True
+except ImportError:
+    HAVE_REPORTLAB = False
+    logger.warning("⚠  reportlab no instalado: no se generará PDF")
+
+
+# ---- estilos y helpers PDF ----
 def S(name, **kw):
+    if not HAVE_REPORTLAB:
+        return None
     return ParagraphStyle(name, **kw)
 
 
-TEAL   = HexColor('#01696f')
-DARK   = HexColor('#28251d')
-MUTED  = HexColor('#7a7974')
-ORANGE = HexColor('#da7101')
-PURPLE = HexColor('#7a39bb')
-BG_EQ  = HexColor('#eef5f4')
-BG_NUM = HexColor('#fdf3e7')
-BG_SS  = HexColor('#f5f0fa')
-WARN   = HexColor('#fdf3e7')
-WARN_B = HexColor('#da7101')
-WHITE  = colors.white
-DIVIDER = HexColor('#dcd9d5')
+TEAL   = HexColor('#01696f') if HAVE_REPORTLAB else None
+DARK   = HexColor('#28251d') if HAVE_REPORTLAB else None
+MUTED  = HexColor('#7a7974') if HAVE_REPORTLAB else None
+ORANGE = HexColor('#da7101') if HAVE_REPORTLAB else None
+PURPLE = HexColor('#7a39bb') if HAVE_REPORTLAB else None
+BG_EQ  = HexColor('#eef5f4') if HAVE_REPORTLAB else None
+BG_NUM = HexColor('#fdf3e7') if HAVE_REPORTLAB else None
+BG_SS  = HexColor('#f5f0fa') if HAVE_REPORTLAB else None
+WARN   = HexColor('#fdf3e7') if HAVE_REPORTLAB else None
+WARN_B = HexColor('#da7101') if HAVE_REPORTLAB else None
+WHITE  = colors.white if HAVE_REPORTLAB else None
+DIVIDER = HexColor('#dcd9d5') if HAVE_REPORTLAB else None
 
 
 title_s = S('title', fontName='Helvetica-Bold', fontSize=20,
-            textColor=DARK, alignment=TA_CENTER, spaceAfter=2)
+            textColor=DARK, alignment=TA_CENTER, spaceAfter=2) if HAVE_REPORTLAB else None
 subtitle_s = S('sub', fontName='Helvetica', fontSize=10,
-               textColor=MUTED, alignment=TA_CENTER, spaceAfter=6)
+               textColor=MUTED, alignment=TA_CENTER, spaceAfter=6) if HAVE_REPORTLAB else None
 h2_s = S('h2', fontName='Helvetica-Bold', fontSize=13,
-         textColor=TEAL, spaceBefore=10, spaceAfter=4)
+         textColor=TEAL, spaceBefore=10, spaceAfter=4) if HAVE_REPORTLAB else None
 body_s = S('body', fontName='Helvetica', fontSize=9.5,
-           textColor=DARK, leading=15, alignment=TA_JUSTIFY, spaceAfter=4)
+           textColor=DARK, leading=15, alignment=TA_JUSTIFY, spaceAfter=4) if HAVE_REPORTLAB else None
 small_s = S('small', fontName='Helvetica-Oblique', fontSize=8.5,
-            textColor=MUTED, spaceAfter=2)
+            textColor=MUTED, spaceAfter=2) if HAVE_REPORTLAB else None
 eq_s = S('eq', fontName='Helvetica-Bold', fontSize=10,
          textColor=HexColor('#0f3638'), alignment=TA_CENTER,
-         leading=16, spaceAfter=2)
+         leading=16, spaceAfter=2) if HAVE_REPORTLAB else None
 eq_num_s = S('eqnum', fontName='Helvetica', fontSize=8.5,
-             textColor=MUTED, alignment=TA_CENTER, spaceAfter=0)
+             textColor=MUTED, alignment=TA_CENTER, spaceAfter=0) if HAVE_REPORTLAB else None
 num_eq_s = S('numeq', fontName='Helvetica-Bold', fontSize=9.5,
              textColor=HexColor('#4b2614'), alignment=TA_CENTER,
-             leading=15, spaceAfter=2)
+             leading=15, spaceAfter=2) if HAVE_REPORTLAB else None
 warn_s = S('warn', fontName='Helvetica', fontSize=9,
            textColor=HexColor('#964219'), leading=14,
-           alignment=TA_LEFT, spaceAfter=4)
+           alignment=TA_LEFT, spaceAfter=4) if HAVE_REPORTLAB else None
 ss_s = S('ss', fontName='Helvetica-Bold', fontSize=10,
          textColor=HexColor('#431673'), leading=17,
-         alignment=TA_LEFT, spaceAfter=0)
+         alignment=TA_LEFT, spaceAfter=0) if HAVE_REPORTLAB else None
 
 
 def eq_table(lines, bg_color, border_color, num):
+    if not HAVE_REPORTLAB:
+        return None
     data = [[Paragraph('<br/>'.join(lines),
                        eq_s if bg_color == BG_EQ else num_eq_s)]]
     t = Table(data, colWidths=[14.5*cm])
@@ -96,6 +118,8 @@ def eq_table(lines, bg_color, border_color, num):
 
 
 def param_table(L1, L2, m1, m2, g):
+    if not HAVE_REPORTLAB:
+        return None
     rows = [
         ['Símbolo', 'Valor', 'Descripción'],
         ['L₁', f'{L1:.4f} m', 'Longitud barra 1'],

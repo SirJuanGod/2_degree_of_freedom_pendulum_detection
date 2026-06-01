@@ -1,7 +1,29 @@
-ultralytics>=8.0.0
-opencv-python>=4.8.0
-numpy>=1.24.0
-scipy>=1.11.0
-matplotlib>=3.7.0
-pyyaml>=6.0
-control>=0.9.4
+# Core Dependencies
+ultralytics>=8.2.0          # YOLO v8 detection
+opencv-python>=4.8.0       # Video processing
+numpy>=1.24.0              # Numerical computing
+scipy>=1.11.0              # Scientific computing
+matplotlib>=3.7.0          # Plotting
+pyyaml>=6.0                # YAML config parsing
+control>=0.9.4             # Control systems analysis
+
+# JAX ecosystem (for parameter identification)
+jax>=0.4.13                # JAX framework (auto-detects GPU)
+jaxlib>=0.4.13             # JAX compiler
+diffrax>=0.4.1             # ODE solver for JAX
+optax>=0.2.2               # Optimization for JAX
+
+# MuJoCo (physics simulation)
+mujoco>=3.0.0              # Physics engine
+
+# Reporting
+reportlab>=4.0.0           # PDF generation
+
+# Development/Optional
+pytest>=7.0.0              # Testing (optional)
+black>=23.0.0              # Code formatting (optional)
+
+# GPU SUPPORT (optional, uncomment for CUDA):
+# For NVIDIA GPU, install: pip install jax[cuda12_cudnn82]
+# For Apple Metal, JAX auto-detects
+# For CPU only, this file is sufficient

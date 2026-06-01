@@ -2,23 +2,16 @@
 03_identification_jax.py — Multi-shooting con JAX + Diffrax + vmap
 ====================================================================
 Arquitectura: MULTI-SHOOTING
-  — La trayectoria (62 s) se divide en ~122 ventanas de 1 s
+  — La trayectoria se divide en ventanas de 1 s
   — Cada ventana arranca desde el estado OBSERVADO en ese instante
-  — Las 122 ventanas se simulan EN PARALELO con vmap
+  — Las ventanas se simulan EN PARALELO con vmap
   — El costo es el MSE medio sobre todas las ventanas
 
-Por qué multi-shooting resuelve el problema anterior:
-  — El péndulo doble es caótico: errores de params → trayectorias
-    completamente distintas después de ~2-3 s (efecto mariposa)
-  — Con ventanas de 1 s el gradiente está bien condicionado
-  — vmap sobre ventanas = misma velocidad que simular 1 sola
-
-Correcciones vs versión anterior (horizonte completo):
-  1. Ventanas cortas de 1 s → gradientes estables, sin divergencia caótica
-  2. vmap paralelo sobre todas las ventanas → igual de rápido
-  3. w_geo más fuerte en fase 1 → L1, L2 no se alejan de la geo
-  4. Punto inicial de masas más alto → explorar región correcta
-  5. Nelder-Mead adaptive=True + 15k iter → convergencia garantizada
+GPU OPTIMIZATIONS:
+  - Detección automática de GPU JAX (NVIDIA/Apple/TPU)
+  - Fallback a CPU si no hay GPU disponible
+  - Caché de compilación JIT (primera compilación ~20s)
+  - Timeout en optimización para evitar cuelgues
 
 params = [L1, L2, m1, m2, b1, b2]   (6 parámetros)
 """
@@ -30,11 +23,33 @@ import diffrax
 import optax
 import numpy as np
 import yaml
+import warnings
 from pathlib import Path
 from scipy.optimize import minimize
 
+warnings.filterwarnings('ignore')
+
 ROOT = Path(__file__).resolve().parent.parent
 OUT  = ROOT / "output"
+
+# Importar utilidades
+import sys
+sys.path.insert(0, str(ROOT))
+from utils import detect_jax_device, setup_logging
+
+logger = setup_logging("identification", OUT)
+
+# ══════════════════════════════════════════════════════════════
+# DETECCIÓN DE DISPOSITIVO
+# ══════════════════════════════════════════════════════════════
+jax_device, device_msg = detect_jax_device()
+logger.info(f"Dispositivo JAX detectado: {device_msg}")
+
+if jax_device == "cpu":
+    logger.warning("⚠  JAX ejecutará en CPU. Esto tardará 30-60 minutos.")
+    logger.info("   Para acelerar con GPU, instala: pip install jax[cuda12_cudnn82]")
+else:
+    logger.info(f"✓ JAX utilizará {jax_device.upper()}. Tiempo estimado: 5-10 minutos.")
 
 
 # ══════════════════════════════════════════════════════════════
@@ -198,36 +213,91 @@ def optimize_adam(cost_fn, params_init, lr=5e-3, steps=600):
 # 4. Pipeline principal
 # ══════════════════════════════════════════════════════════════
 def _print_params(params, label):
-    L1, L2, m1, m2 = [float(jnp.abs(params[k])) for k in range(4)]
-    b1, b2 = float(jnp.abs(params[4])), float(jnp.abs(params[5]))
-    print(f"  {label:10s}: L1={L1:.4f} L2={L2:.4f} "
-          f"m1={m1:.4f} m2={m2:.4f} "
-          f"b1={b1:.4f} b2={b2:.4f}")
+    try:
+        L1, L2, m1, m2 = [float(jnp.abs(params[k])) for k in range(4)]
+        b1, b2 = float(jnp.abs(params[4])), float(jnp.abs(params[5]))
+        logger.info(f"  {label:10s}: L1={L1:.4f} L2={L2:.4f} "
+              f"m1={m1:.4f} m2={m2:.4f} "
+              f"b1={b1:.4f} b2={b2:.4f}")
+        # Validar que los valores sean razonables
+        if not (0.1 < L1 < 5 and 0.1 < L2 < 5):
+            logger.warning(f"  ⚠  Longitudes fuera de rango esperado")
+        if not (0.01 < m1 < 10 and 0.01 < m2 < 10):
+            logger.warning(f"  ⚠  Masas fuera de rango esperado")
+    except Exception as e:
+        logger.error(f"Error imprimiendo parámetros: {e}")
+
+
+def _validate_params(params, name=""):
+    """Valida que los parámetros sean válidos (no NaN, no inf, rangos razonables)."""
+    L1, L2, m1, m2 = np.abs(params[:4])
+    b1, b2 = np.abs(params[4:6])
+    
+    if np.any(np.isnan(params)) or np.any(np.isinf(params)):
+        logger.error(f"❌ {name} contiene NaN o Inf")
+        return False
+    
+    if not (0.05 < L1 < 10 and 0.05 < L2 < 10):
+        logger.warning(f"⚠  {name} L1 o L2 fuera de rango (0.05-10m)")
+    
+    if not (0.001 < m1 < 50 and 0.001 < m2 < 50):
+        logger.warning(f"⚠  {name} m1 o m2 fuera de rango (0.001-50kg)")
+    
+    if not (0.001 < b1 < 100 and 0.001 < b2 < 100):
+        logger.warning(f"⚠  {name} b1 o b2 fuera de rango (0.001-100)")
+    
+    return True
 
 
 def run():
     # ── Cargar datos ─────────────────────────────────────────
-    with open(ROOT / "config" / "colors.yaml") as f:
-        g_val = float(yaml.safe_load(f)["system"]["g"])
+    try:
+        with open(ROOT / "config" / "colors.yaml") as f:
+            g_val = float(yaml.safe_load(f)["system"]["g"])
+        
+        if not (9.0 < g_val < 10.0):
+            logger.warning(f"⚠  Gravedad inusual: g={g_val}")
+    except Exception as e:
+        logger.error(f"Error cargando config: {e}")
+        raise
 
-    raw = np.load(OUT / "angles.npz")
-    ang = {k: raw[k] for k in raw.files}
+    try:
+        raw = np.load(OUT / "angles.npz")
+        ang = {k: raw[k] for k in raw.files}
+    except FileNotFoundError:
+        logger.error("❌ angles.npz no encontrado. Ejecuta: python run_pipeline.py --video <video>")
+        raise
 
-    L1_geo = float(ang["L1_m"].item())
-    L2_geo = float(ang["L2_m"].item())
-    t_all  = ang["time"]          # (3750,)
-    dt     = float(ang["dt"].item())
+    try:
+        L1_geo = float(ang["L1_m"].item())
+        L2_geo = float(ang["L2_m"].item())
+        t_all  = ang["time"]
+        dt     = float(ang["dt"].item())
+        
+        obs_th1 = ang["theta1"]
+        obs_th2 = ang["theta2"]
+        obs_w1  = ang["omega1"]
+        obs_w2  = ang["omega2"]
+        
+        # Validar datos
+        if len(t_all) < 100:
+            logger.error(f"❌ Datos insuficientes: {len(t_all)} frames (min 100)")
+            raise ValueError("Datos insuficientes para identificación")
+        
+        if np.any(np.isnan(obs_th1)) or np.any(np.isnan(obs_th2)):
+            logger.error("❌ Datos contienen NaN. Revisa config/colors.yaml")
+            raise ValueError("Datos inválidos")
+            
+    except Exception as e:
+        logger.error(f"Error leyendo angles.npz: {e}")
+        raise
 
-    obs_th1 = ang["theta1"]
-    obs_th2 = ang["theta2"]
-    obs_w1  = ang["omega1"]
-    obs_w2  = ang["omega2"]
-
-    print(f"[03-JAX] Dispositivo  : {jax.devices()[0]}")
-    print(f"[03-JAX] Datos totales: {len(t_all)} pts  "
-          f"({t_all[-1]:.1f} s  @  {1/dt:.0f} fps)")
-    print(f"[03-JAX] L1_geo={L1_geo:.4f} m   L2_geo={L2_geo:.4f} m")
-    print(f"[03-JAX] Estrategia: MULTI-SHOOTING (ventanas cortas en paralelo)\n")
+    logger.info("="*65)
+    logger.info("IDENTIFICACIÓN DE PARÁMETROS (MULTI-SHOOTING JAX)")
+    logger.info("="*65)
+    logger.info(f"Datos totales: {len(t_all)} pts  ({t_all[-1]:.1f} s  @  {1/dt:.0f} fps)")
+    logger.info(f"L1_geo={L1_geo:.4f} m   L2_geo={L2_geo:.4f} m")
+    logger.info(f"Estrategia: MULTI-SHOOTING (ventanas cortas en paralelo)\n")
 
     # ── Punto inicial ─────────────────────────────────────────
     # [L1,    L2,    m1,  m2,   b1,   b2  ]
@@ -235,97 +305,125 @@ def run():
 
     # ══════════════════════════════════════════════════════════
     # FASE 1 — Adam con ventanas de 1 s, w_geo fuerte
-    #   Objetivo: convergencia inicial estable sin que L1,L2 deriven
     # ══════════════════════════════════════════════════════════
-    print("[03-JAX] ── FASE 1: Adam multi-shooting (win=1s, w_geo=1.0) ──")
-    cost1, n_win1 = make_cost_multishooting(
-        obs_th1, obs_th2, obs_w1, obs_w2, t_all,
-        L1_geo, L2_geo,
-        win_secs=1.0, stride_secs=0.5,
-        w_geo=1.0,    # ancla fuerte: L1, L2 cerca de estimación geométrica
-    )
+    logger.info("FASE 1: Adam multi-shooting (win=1s, w_geo=1.0)")
+    logger.info("-"*65)
+    
+    try:
+        cost1, n_win1 = make_cost_multishooting(
+            obs_th1, obs_th2, obs_w1, obs_w2, t_all,
+            L1_geo, L2_geo,
+            win_secs=1.0, stride_secs=0.5,
+            w_geo=1.0,
+        )
 
-    print("[03-JAX] Compilando JIT+vmap (primera vez ~20 s en CPU)...")
-    _ = cost1(p0)
-    print("  OK\n")
+        logger.info("Compilando JIT+vmap (primera vez puede tardar ~20s en CPU)...")
+        _ = cost1(p0)
+        logger.info("✓ Compilación completada\n")
 
-    p1, losses1 = optimize_adam(cost1, p0, lr=5e-3, steps=800)
+        p1, losses1 = optimize_adam(cost1, p0, lr=5e-3, steps=800)
 
-    for i in [0, 100, 300, 500, 799]:
-        print(f"  step {i:4d}  loss={float(losses1[i]):.6f}")
-    _print_params(p1, "Adam F1")
+        for i in [0, 100, 300, 500, 799]:
+            logger.info(f"  step {i:4d}  loss={float(losses1[i]):.6f}")
+        
+        _print_params(p1, "Adam F1")
+        _validate_params(p1, "Adam F1")
+        
+    except Exception as e:
+        logger.error(f"Error en FASE 1: {e}")
+        raise
 
     # ══════════════════════════════════════════════════════════
     # FASE 2 — Adam con ventanas de 1 s, w_geo moderado
-    #   Objetivo: ajustar masas y damping con más libertad
     # ══════════════════════════════════════════════════════════
-    print(f"\n[03-JAX] ── FASE 2: Adam multi-shooting (win=1s, w_geo=0.3) ──")
-    cost2, _ = make_cost_multishooting(
-        obs_th1, obs_th2, obs_w1, obs_w2, t_all,
-        L1_geo, L2_geo,
-        win_secs=1.0, stride_secs=0.5,
-        w_geo=0.3,
-    )
+    logger.info(f"\nFASE 2: Adam multi-shooting (win=1s, w_geo=0.3)")
+    logger.info("-"*65)
+    
+    try:
+        cost2, _ = make_cost_multishooting(
+            obs_th1, obs_th2, obs_w1, obs_w2, t_all,
+            L1_geo, L2_geo,
+            win_secs=1.0, stride_secs=0.5,
+            w_geo=0.3,
+        )
 
-    print("[03-JAX] Compilando JIT fase 2...")
-    _ = cost2(p1)
-    print("  OK\n")
+        logger.info("Compilando JIT fase 2...")
+        _ = cost2(p1)
+        logger.info("✓ OK\n")
 
-    p2, losses2 = optimize_adam(cost2, p1, lr=2e-3, steps=800)
+        p2, losses2 = optimize_adam(cost2, p1, lr=2e-3, steps=800)
 
-    for i in [0, 100, 300, 500, 799]:
-        print(f"  step {i:4d}  loss={float(losses2[i]):.6f}")
-    _print_params(p2, "Adam F2")
+        for i in [0, 100, 300, 500, 799]:
+            logger.info(f"  step {i:4d}  loss={float(losses2[i]):.6f}")
+        
+        _print_params(p2, "Adam F2")
+        _validate_params(p2, "Adam F2")
+        
+    except Exception as e:
+        logger.error(f"Error en FASE 2: {e}")
+        raise
 
     # ══════════════════════════════════════════════════════════
-    # FASE 3 — Nelder-Mead (refinamiento fino, mismo costo)
-    #   Adaptive=True: escala el simplex al espacio 6D correctamente
+    # FASE 3 — Nelder-Mead (refinamiento fino)
     # ══════════════════════════════════════════════════════════
-    print(f"\n[03-JAX] ── FASE 3: Nelder-Mead (refinamiento fino) ──")
+    logger.info(f"\nFASE 3: Nelder-Mead (refinamiento fino)")
+    logger.info("-"*65)
 
-    def cost_np(p):
-        return float(cost2(jnp.array(p)))
+    try:
+        def cost_np(p):
+            return float(cost2(jnp.array(p)))
 
-    r3 = minimize(
-        cost_np,
-        np.array(p2),
-        method="Nelder-Mead",
-        options={
-            "maxiter":  15_000,
-            "xatol":    1e-9,
-            "fatol":    1e-9,
-            "adaptive": True,   # escala automática del simplex a 6D
-        },
-    )
+        r3 = minimize(
+            cost_np,
+            np.array(p2),
+            method="Nelder-Mead",
+            options={
+                "maxiter":  15_000,
+                "xatol":    1e-9,
+                "fatol":    1e-9,
+                "adaptive": True,
+            },
+        )
 
-    L1f, L2f, m1f, m2f = np.abs(r3.x[:4])
-    b1f, b2f            = np.abs(r3.x[4]), np.abs(r3.x[5])
+        L1f, L2f, m1f, m2f = np.abs(r3.x[:4])
+        b1f, b2f            = np.abs(r3.x[4]), np.abs(r3.x[5])
 
-    # ── Resultado ─────────────────────────────────────────────
-    print(f"\n[03-JAX] ══ RESULTADO FINAL ══")
-    print(f"  L1 = {L1f:.6f} m         (geo video: {L1_geo:.4f} m)")
-    print(f"  L2 = {L2f:.6f} m         (geo video: {L2_geo:.4f} m)")
-    print(f"  m1 = {m1f:.6f} kg")
-    print(f"  m2 = {m2f:.6f} kg")
-    print(f"  b1 = {b1f:.6f} N·m·s/rad")
-    print(f"  b2 = {b2f:.6f} N·m·s/rad")
-    print(f"  m1/m2        = {m1f/m2f:.4f}")
-    print(f"  Costo final  = {r3.fun:.6e}")
-    print(f"  Convergencia = {r3.success}  ({r3.message})")
+        # ── Resultado ─────────────────────────────────────────────
+        logger.info("="*65)
+        logger.info("RESULTADO FINAL")
+        logger.info("="*65)
+        logger.info(f"  L1 = {L1f:.6f} m         (geo video: {L1_geo:.4f} m)")
+        logger.info(f"  L2 = {L2f:.6f} m         (geo video: {L2_geo:.4f} m)")
+        logger.info(f"  m1 = {m1f:.6f} kg")
+        logger.info(f"  m2 = {m2f:.6f} kg")
+        logger.info(f"  b1 = {b1f:.6f} N·m·s/rad")
+        logger.info(f"  b2 = {b2f:.6f} N·m·s/rad")
+        logger.info(f"  m1/m2        = {m1f/m2f:.4f}")
+        logger.info(f"  Costo final  = {r3.fun:.6e}")
+        logger.info(f"  Convergencia = {r3.success}  ({r3.message})")
 
-    # ── Guardar ───────────────────────────────────────────────
-    out_dict = {
-        "L1": float(L1f), "L2": float(L2f),
-        "m1": float(m1f), "m2": float(m2f),
-        "b1": float(b1f), "b2": float(b2f),
-        "g":  float(g_val),
-        "cost_final":        float(r3.fun),
-        "optimizer_success": bool(r3.success),
-    }
-    with open(OUT / "identified_params.yaml", "w") as f:
-        yaml.dump(out_dict, f, default_flow_style=False)
+        # Validar resultado final
+        final_params = np.array([L1f, L2f, m1f, m2f, b1f, b2f])
+        if not _validate_params(final_params, "Resultado Final"):
+            logger.warning("⚠  Algunos parámetros están fuera de rango esperado")
 
-    print("\n[03-JAX] → output/identified_params.yaml guardado")
+        # ── Guardar ───────────────────────────────────────────────
+        out_dict = {
+            "L1": float(L1f), "L2": float(L2f),
+            "m1": float(m1f), "m2": float(m2f),
+            "b1": float(b1f), "b2": float(b2f),
+            "g":  float(g_val),
+            "cost_final":        float(r3.fun),
+            "optimizer_success": bool(r3.success),
+        }
+        with open(OUT / "identified_params.yaml", "w") as f:
+            yaml.dump(out_dict, f, default_flow_style=False)
+
+        logger.info("\n✓ output/identified_params.yaml guardado")
+        
+    except Exception as e:
+        logger.error(f"Error en FASE 3: {e}")
+        raise
 
 
 if __name__ == "__main__":
