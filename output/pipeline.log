@@ -1,0 +1,323 @@
+[INFO     | pipeline] Video: videos/pendul.mp4
+[INFO     | pipeline] Skip ID: False, Skip LIN: False
+
+[INFO     | tracker] Dispositivo detectado: CUDA GPU: NVIDIA GeForce RTX 3060 (GPUs disponibles: 1)
+[ERROR    | pipeline] ❌ Error cargando módulos: No module named 'diffrax'
+[INFO     | pipeline] Video: videos/pendul.mp4
+[INFO     | pipeline] Skip ID: False, Skip LIN: False
+
+[INFO     | tracker] Dispositivo detectado: CUDA GPU: NVIDIA GeForce RTX 3060 (GPUs disponibles: 1)
+[INFO     | identification] Dispositivo JAX detectado: CPU
+[WARNING  | identification] ⚠  JAX ejecutará en CPU. Esto tardará 30-60 minutos.
+[INFO     | identification]    Para acelerar con GPU, instala: pip install jax[cuda12_cudnn82]
+[INFO     | pipeline] PASO 1/5: YOLO TRACKING + FILTRO HSV
+[INFO     | tracker] Cargando YOLO8n (device=cuda:0)...
+[INFO     | tracker] ✓ YOLO warmup completado
+[INFO     | tracker] [01] 720x464 @ 60.0fps  →  videos/pendul.mp4  (formato: .mp4)
+[INFO     | tracker] [01] Estrategia: YOLO ROI (pase 1) + Full-frame HSV (pase 2)
+[INFO     | tracker] [01] Video de salida: /home/usc/sys2/2_degree_of_freedom_pendulum_detection/output/video_tracked.mp4
+[INFO     | tracker] frame   200  t=3.33s  |  pivot:1  joint:178  tip:146
+[INFO     | tracker] frame   400  t=6.67s  |  pivot:1  joint:378  tip:346
+[INFO     | tracker] frame   600  t=10.00s  |  pivot:1  joint:578  tip:546
+[INFO     | tracker] 
+=================================================================
+[INFO     | tracker] REPORTE DE DETECCIÓN (637 frames totales)
+[INFO     | tracker] =================================================================
+[INFO     | tracker] Color        YOLO(p1)  Full-frame(p2)   Perdidos    Total  Cobertura
+[INFO     | tracker] ─────────────────────────────────────────────────────────────────
+[INFO     | tracker] pivot               1               0        636        1       0.2%
+[INFO     | tracker] joint             272             343         22      615      96.5%
+[INFO     | tracker] tip               234             349         54      583      91.5%
+[WARNING  | tracker] 
+⚠  Colores con < 50% cobertura: ['pivot']
+[WARNING  | tracker]    Recalibra con: python src/00_calibrate_hsv.py --video <video> --frame 100
+[INFO     | tracker] 
+✓ output/trajectories.npz  +  output/video_tracked.mp4
+[INFO     | tracker]   pivot: 1 puntos
+[INFO     | tracker]   joint: 615 puntos
+[INFO     | tracker]   tip: 583 puntos
+[INFO     | pipeline] ✓ PASO 1 completado
+[INFO     | pipeline] PASO 2/5: CÁLCULO DE ÁNGULOS
+[ERROR    | pipeline] ✗ Error en PASO 2: Solo 1 frames con los 3 colores detectados. Revisa config/colors.yaml.
+[INFO     | pipeline] Video: videos/pendul_r_r.mp4
+[INFO     | pipeline] Skip ID: False, Skip LIN: False
+
+[INFO     | tracker] Dispositivo detectado: CUDA GPU: NVIDIA GeForce RTX 3060 (GPUs disponibles: 1)
+[INFO     | identification] Dispositivo JAX detectado: CPU
+[WARNING  | identification] ⚠  JAX ejecutará en CPU. Esto tardará 30-60 minutos.
+[INFO     | identification]    Para acelerar con GPU, instala: pip install jax[cuda12_cudnn82]
+[INFO     | pipeline] PASO 1/5: YOLO TRACKING + FILTRO HSV
+[INFO     | tracker] Cargando YOLO8n (device=cuda:0)...
+[INFO     | tracker] ✓ YOLO warmup completado
+[INFO     | tracker] [01] 1920x1080 @ 30.0fps  →  videos/pendul_r_r.mp4  (formato: .mp4)
+[INFO     | tracker] [01] Estrategia: YOLO ROI (pase 1) + Full-frame HSV (pase 2)
+[INFO     | tracker] [01] Video de salida: /home/usc/sys2/2_degree_of_freedom_pendulum_detection/output/video_tracked.mp4
+[INFO     | tracker] frame   200  t=6.67s  |  pivot:200  joint:200  tip:177
+[INFO     | tracker] 
+=================================================================
+[INFO     | tracker] REPORTE DE DETECCIÓN (390 frames totales)
+[INFO     | tracker] =================================================================
+[INFO     | tracker] Color        YOLO(p1)  Full-frame(p2)   Perdidos    Total  Cobertura
+[INFO     | tracker] ─────────────────────────────────────────────────────────────────
+[INFO     | tracker] pivot             133             257          0      390     100.0%
+[INFO     | tracker] joint             122             268          0      390     100.0%
+[INFO     | tracker] tip                93             274         23      367      94.1%
+[INFO     | tracker] 
+✓ output/trajectories.npz  +  output/video_tracked.mp4
+[INFO     | tracker]   pivot: 390 puntos
+[INFO     | tracker]   joint: 390 puntos
+[INFO     | tracker]   tip: 367 puntos
+[INFO     | pipeline] ✓ PASO 1 completado
+[INFO     | pipeline] PASO 2/5: CÁLCULO DE ÁNGULOS
+[INFO     | pipeline] ✓ PASO 2 completado
+[INFO     | pipeline] PASO 3/5: IDENTIFICACIÓN DE PARÁMETROS (JAX/GPU)
+[INFO     | identification] =================================================================
+[INFO     | identification] IDENTIFICACIÓN DE PARÁMETROS (MULTI-SHOOTING JAX)
+[INFO     | identification] =================================================================
+[INFO     | identification] Datos totales: 367 pts  (12.2 s  @  30 fps)
+[INFO     | identification] L1_geo=0.1959 m   L2_geo=0.2441 m
+[INFO     | identification] Estrategia: MULTI-SHOOTING (ventanas cortas en paralelo)
+
+[INFO     | identification] FASE 1: Adam multi-shooting (win=1s, w_geo=1.0)
+[INFO     | identification] -----------------------------------------------------------------
+[INFO     | identification] Compilando JIT+vmap (primera vez puede tardar ~20s en CPU)...
+[INFO     | identification] ✓ Compilación completada
+
+[INFO     | identification]   step    0  loss=3.337287
+[INFO     | identification]   step  100  loss=0.872998
+[INFO     | identification]   step  300  loss=0.667659
+[INFO     | identification]   step  500  loss=0.506113
+[INFO     | identification]   step  799  loss=0.505711
+[INFO     | identification]   Adam F1   : L1=0.2050 L2=0.2090 m1=0.3769 m2=0.0005 b1=0.7006 b2=0.6903
+[WARNING  | identification]   ⚠  Masas fuera de rango esperado
+[WARNING  | identification] ⚠  Adam F1 m1 o m2 fuera de rango (0.001-50kg)
+[INFO     | identification] 
+FASE 2: Adam multi-shooting (win=1s, w_geo=0.3)
+[INFO     | identification] -----------------------------------------------------------------
+[INFO     | identification] Compilando JIT fase 2...
+[INFO     | identification] ✓ OK
+
+[INFO     | identification]   step    0  loss=0.489784
+[INFO     | identification]   step  100  loss=0.480568
+[INFO     | identification]   step  300  loss=0.480711
+[INFO     | identification]   step  500  loss=0.480710
+[INFO     | identification]   step  799  loss=0.480722
+[INFO     | identification]   Adam F2   : L1=0.2174 L2=0.1921 m1=0.4159 m2=0.0004 b1=0.8655 b2=0.6466
+[WARNING  | identification]   ⚠  Masas fuera de rango esperado
+[WARNING  | identification] ⚠  Adam F2 m1 o m2 fuera de rango (0.001-50kg)
+[INFO     | identification] 
+FASE 3: Nelder-Mead (refinamiento fino)
+[INFO     | identification] -----------------------------------------------------------------
+[INFO     | identification] =================================================================
+[INFO     | identification] RESULTADO FINAL
+[INFO     | identification] =================================================================
+[INFO     | identification]   L1 = 0.217408 m         (geo video: 0.1959 m)
+[INFO     | identification]   L2 = 0.192043 m         (geo video: 0.2441 m)
+[INFO     | identification]   m1 = 0.432329 kg
+[INFO     | identification]   m2 = 0.000000 kg
+[INFO     | identification]   b1 = 0.901678 N·m·s/rad
+[INFO     | identification]   b2 = 0.671807 N·m·s/rad
+[INFO     | identification]   m1/m2        = 3468096.2500
+[INFO     | identification]   Costo final  = 4.805421e-01
+[INFO     | identification]   Convergencia = False  (Maximum number of iterations has been exceeded.)
+[WARNING  | identification] ⚠  Resultado Final m1 o m2 fuera de rango (0.001-50kg)
+[INFO     | identification] 
+✓ output/identified_params.yaml guardado
+[INFO     | pipeline] ✓ PASO 3 completado
+[INFO     | pipeline] PASO 4/5: LINEALIZACIÓN + ESTABILIDAD
+[INFO     | linearization] =================================================================
+[INFO     | linearization] ANÁLISIS DE ESTABILIDAD (Linealización)
+[INFO     | linearization] =================================================================
+[INFO     | linearization] ✓ Parámetros cargados:
+[INFO     | linearization]   L1=0.2174m  L2=0.1920m  m1=0.4323kg  m2=0.0000kg  g=9.81m/s²
+[INFO     | linearization] 
+-----------------------------------------------------------------
+[INFO     | linearization] ANÁLISIS DE EQUILIBRIOS
+[INFO     | linearization] -----------------------------------------------------------------
+[INFO     | linearization] 
+  P1_colgante  →  SILLA
+[INFO     | linearization]   Eigenvalores: [-0.+7.1472j -0.-7.1472j  0.+6.7173j  0.-6.7173j]
+[INFO     | linearization]   A:
+[[          0           0           1           0]
+ [          0           0           0           1]
+ [    -45.123       1e-05           0           0]
+ [     51.082     -51.082           0           0]]
+[INFO     | linearization] 
+  P2_semi_inv_b1  →  SILLA
+[INFO     | linearization]   Eigenvalores: [-6.7173+0.j      6.7173+0.j      0.    +7.1472j  0.    -7.1472j]
+[INFO     | linearization]   A:
+[[          0           0           1           0]
+ [          0           0           0           1]
+ [     45.123      -1e-05           0           0]
+ [     51.082     -51.082           0           0]]
+[INFO     | linearization] 
+  P3_semi_inv_b2  →  SILLA
+[INFO     | linearization]   Eigenvalores: [-7.1472+0.j      0.    +6.7173j  0.    -6.7173j  7.1472+0.j    ]
+[INFO     | linearization]   A:
+[[          0           0           1           0]
+ [          0           0           0           1]
+ [    -45.123       1e-05          -0           0]
+ [    -51.082      51.082          -0           0]]
+[INFO     | linearization] 
+  P4_invertido  →  SILLA
+[INFO     | linearization]   Eigenvalores: [     7.1472      6.7173     -7.1472     -6.7173]
+[INFO     | linearization]   A:
+[[          0           0           1           0]
+ [          0           0           0           1]
+ [     45.123      -1e-05           0           0]
+ [    -51.082      51.082           0           0]]
+[INFO     | linearization] 
+✓ output/linear_models.yaml guardado
+[INFO     | linearization] ✓ output/pendulo_modelo.mat guardado
+[INFO     | linearization] ✓ output/plot_eigenvalues.png guardado
+[WARNING  | linearization] ⚠  No hay equilibrio estable: no se generó respuesta libre
+[INFO     | linearization] 
+=================================================================
+[INFO     | linearization] ✓ Análisis de linealización completado
+[INFO     | linearization] =================================================================
+[INFO     | pipeline] ✓ PASO 4 completado
+[INFO     | pipeline] PASO 5/5: GENERACIÓN DE REPORTE
+[INFO     | pipeline] ✓ PASO 5 completado
+[INFO     | pipeline] ✓ Pipeline completado en 101.0s
+[INFO     | pipeline] Pipeline finalizado: 0 error(es)
+[INFO     | pipeline] Video: videos/pendul_r_r.mp4
+[INFO     | pipeline] Skip ID: False, Skip LIN: False
+
+[INFO     | tracker] Dispositivo detectado: CUDA GPU: NVIDIA GeForce RTX 3060 (GPUs disponibles: 1)
+[INFO     | identification] Dispositivo JAX detectado: CPU
+[WARNING  | identification] ⚠  JAX ejecutará en CPU. Esto tardará 30-60 minutos.
+[INFO     | identification]    Para acelerar con GPU, instala: pip install jax[cuda12_cudnn82]
+[INFO     | pipeline] PASO 1/5: YOLO TRACKING + FILTRO HSV
+[INFO     | tracker] Cargando YOLO26n (device=cuda:0)...
+[INFO     | tracker] ✓ YOLO warmup completado
+[INFO     | tracker] [01] 1920x1080 @ 30.0fps  →  videos/pendul_r_r.mp4  (formato: .mp4)
+[INFO     | tracker] [01] Estrategia: YOLO ROI (pase 1) + Full-frame HSV (pase 2)
+[INFO     | tracker] [01] Video de salida: /home/usc/sys2/2_degree_of_freedom_pendulum_detection/output/video_tracked.mp4
+[INFO     | tracker] frame   200  t=6.67s  |  pivot:200  joint:200  tip:177
+[INFO     | tracker] 
+=================================================================
+[INFO     | tracker] REPORTE DE DETECCIÓN (390 frames totales)
+[INFO     | tracker] =================================================================
+[INFO     | tracker] Color        YOLO(p1)  Full-frame(p2)   Perdidos    Total  Cobertura
+[INFO     | tracker] ─────────────────────────────────────────────────────────────────
+[INFO     | tracker] pivot              41             349          0      390     100.0%
+[INFO     | tracker] joint               2             388          0      390     100.0%
+[INFO     | tracker] tip                12             355         23      367      94.1%
+[INFO     | tracker] 
+✓ output/trajectories.npz  +  output/video_tracked.mp4
+[INFO     | tracker]   pivot: 390 puntos
+[INFO     | tracker]   joint: 390 puntos
+[INFO     | tracker]   tip: 367 puntos
+[INFO     | pipeline] ✓ PASO 1 completado
+[INFO     | pipeline] PASO 2/5: CÁLCULO DE ÁNGULOS
+[INFO     | pipeline] ✓ PASO 2 completado
+[INFO     | pipeline] PASO 3/5: IDENTIFICACIÓN DE PARÁMETROS (JAX/GPU)
+[INFO     | identification] =================================================================
+[INFO     | identification] IDENTIFICACIÓN DE PARÁMETROS (MULTI-SHOOTING JAX)
+[INFO     | identification] =================================================================
+[INFO     | identification] Datos totales: 367 pts  (12.2 s  @  30 fps)
+[INFO     | identification] L1_geo=0.1950 m   L2_geo=0.2443 m
+[INFO     | identification] Estrategia: MULTI-SHOOTING (ventanas cortas en paralelo)
+
+[INFO     | identification] FASE 1: Adam multi-shooting (win=1s, w_geo=1.0)
+[INFO     | identification] -----------------------------------------------------------------
+[INFO     | identification] Compilando JIT+vmap (primera vez puede tardar ~20s en CPU)...
+[INFO     | identification] ✓ Compilación completada
+
+[INFO     | identification]   step    0  loss=3.254185
+[INFO     | identification]   step  100  loss=0.856504
+[INFO     | identification]   step  300  loss=0.640924
+[INFO     | identification]   step  500  loss=0.501959
+[INFO     | identification]   step  799  loss=0.501913
+[INFO     | identification]   Adam F1   : L1=0.2048 L2=0.2093 m1=0.3596 m2=0.0004 b1=0.6513 b2=0.6575
+[WARNING  | identification]   ⚠  Masas fuera de rango esperado
+[WARNING  | identification] ⚠  Adam F1 m1 o m2 fuera de rango (0.001-50kg)
+[INFO     | identification] 
+FASE 2: Adam multi-shooting (win=1s, w_geo=0.3)
+[INFO     | identification] -----------------------------------------------------------------
+[INFO     | identification] Compilando JIT fase 2...
+[INFO     | identification] ✓ OK
+
+[INFO     | identification]   step    0  loss=0.485839
+[INFO     | identification]   step  100  loss=0.476411
+[INFO     | identification]   step  300  loss=0.476575
+[INFO     | identification]   step  500  loss=0.476572
+[INFO     | identification]   step  799  loss=0.476585
+[INFO     | identification]   Adam F2   : L1=0.2187 L2=0.1929 m1=0.4008 m2=0.0004 b1=0.8054 b2=0.6258
+[WARNING  | identification]   ⚠  Masas fuera de rango esperado
+[WARNING  | identification] ⚠  Adam F2 m1 o m2 fuera de rango (0.001-50kg)
+[INFO     | identification] 
+FASE 3: Nelder-Mead (refinamiento fino)
+[INFO     | identification] -----------------------------------------------------------------
+[INFO     | identification] =================================================================
+[INFO     | identification] RESULTADO FINAL
+[INFO     | identification] =================================================================
+[INFO     | identification]   L1 = 0.218633 m         (geo video: 0.1950 m)
+[INFO     | identification]   L2 = 0.192872 m         (geo video: 0.2443 m)
+[INFO     | identification]   m1 = 0.426232 kg
+[INFO     | identification]   m2 = 0.000000 kg
+[INFO     | identification]   b1 = 0.857809 N·m·s/rad
+[INFO     | identification]   b2 = 0.664023 N·m·s/rad
+[INFO     | identification]   m1/m2        = 5198990.0000
+[INFO     | identification]   Costo final  = 4.763941e-01
+[INFO     | identification]   Convergencia = False  (Maximum number of iterations has been exceeded.)
+[WARNING  | identification] ⚠  Resultado Final m1 o m2 fuera de rango (0.001-50kg)
+[INFO     | identification] 
+✓ output/identified_params.yaml guardado
+[INFO     | pipeline] ✓ PASO 3 completado
+[INFO     | pipeline] PASO 4/5: LINEALIZACIÓN + ESTABILIDAD
+[INFO     | linearization] =================================================================
+[INFO     | linearization] ANÁLISIS DE ESTABILIDAD (Linealización)
+[INFO     | linearization] =================================================================
+[INFO     | linearization] ✓ Parámetros cargados:
+[INFO     | linearization]   L1=0.2186m  L2=0.1929m  m1=0.4262kg  m2=0.0000kg  g=9.81m/s²
+[INFO     | linearization] 
+-----------------------------------------------------------------
+[INFO     | linearization] ANÁLISIS DE EQUILIBRIOS
+[INFO     | linearization] -----------------------------------------------------------------
+[INFO     | linearization] 
+  P1_colgante  →  SILLA
+[INFO     | linearization]   Eigenvalores: [ 0.+7.1318j  0.-7.1318j -0.+6.6985j -0.-6.6985j]
+[INFO     | linearization]   A:
+[[          0           0           1           0]
+ [          0           0           0           1]
+ [     -44.87       1e-05           0           0]
+ [     50.863     -50.863           0           0]]
+[INFO     | linearization] 
+  P2_semi_inv_b1  →  SILLA
+[INFO     | linearization]   Eigenvalores: [ 6.6985+0.j     -6.6985+0.j     -0.    +7.1318j -0.    -7.1318j]
+[INFO     | linearization]   A:
+[[          0           0           1           0]
+ [          0           0           0           1]
+ [      44.87      -1e-05           0           0]
+ [     50.863     -50.863           0           0]]
+[INFO     | linearization] 
+  P3_semi_inv_b2  →  SILLA
+[INFO     | linearization]   Eigenvalores: [ 7.1318+0.j     -0.    +6.6985j -0.    -6.6985j -7.1318+0.j    ]
+[INFO     | linearization]   A:
+[[          0           0           1           0]
+ [          0           0           0           1]
+ [     -44.87       1e-05          -0           0]
+ [    -50.863      50.863          -0           0]]
+[INFO     | linearization] 
+  P4_invertido  →  SILLA
+[INFO     | linearization]   Eigenvalores: [     7.1318      6.6985     -7.1318     -6.6985]
+[INFO     | linearization]   A:
+[[          0           0           1           0]
+ [          0           0           0           1]
+ [      44.87      -1e-05           0           0]
+ [    -50.863      50.863           0           0]]
+[INFO     | linearization] 
+✓ output/linear_models.yaml guardado
+[INFO     | linearization] ✓ output/pendulo_modelo.mat guardado
+[INFO     | linearization] ✓ output/plot_eigenvalues.png guardado
+[WARNING  | linearization] ⚠  No hay equilibrio estable: no se generó respuesta libre
+[INFO     | linearization] 
+=================================================================
+[INFO     | linearization] ✓ Análisis de linealización completado
+[INFO     | linearization] =================================================================
+[INFO     | pipeline] ✓ PASO 4 completado
+[INFO     | pipeline] PASO 5/5: GENERACIÓN DE REPORTE
+[INFO     | pipeline] ✓ PASO 5 completado
+[INFO     | pipeline] ✓ Pipeline completado en 98.3s
+[INFO     | pipeline] Pipeline finalizado: 0 error(es)

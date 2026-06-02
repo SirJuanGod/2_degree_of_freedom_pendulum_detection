@@ -1,6 +1,10 @@
 """
 00_calibrate_hsv.py — version baja iluminacion
-USO: python src/00_calibrate_hsv.py --video videos/pendulo.mp4 --frame 100
+USO:
+  python src/00_calibrate_hsv.py --video videos/pendulo.mp4 --frame 100
+  python src/00_calibrate_hsv.py --video videos/pendulo.mov --frame 100
+
+Formatos de video soportados: .mp4, .mov, .avi, .mkv
 """
 import cv2, numpy as np, argparse
 
@@ -16,13 +20,34 @@ def enhance(frame_bgr):
     lab_eq = cv2.merge([clahe.apply(l), a, b])
     return cv2.cvtColor(lab_eq, cv2.COLOR_LAB2BGR)
 
+SUPPORTED_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".m4v", ".webm"}
+
 def calibrate(video_path, frame_number=0):
+    # Validar extensión del archivo de video
+    import os
+    ext = os.path.splitext(video_path)[1].lower()
+    if ext not in SUPPORTED_EXTENSIONS:
+        raise ValueError(
+            f"Extensión '{ext}' no soportada. "
+            f"Use uno de: {sorted(SUPPORTED_EXTENSIONS)}"
+        )
+    if not os.path.exists(video_path):
+        raise FileNotFoundError(f"Video no encontrado: {video_path}")
+
     cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        raise ValueError(
+            f"No se pudo abrir el video: {video_path}\n"
+            f"  Verifique que el codec esté disponible para archivos {ext}."
+        )
     cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
     ret, frame = cap.read()
     cap.release()
     if not ret:
-        raise ValueError(f"No se pudo leer frame {frame_number}")
+        raise ValueError(
+            f"No se pudo leer frame {frame_number} del video '{video_path}'.\n"
+            f"  Intente un número de frame menor (el video puede tener menos frames)."
+        )
 
     frame_enh = enhance(frame)   # imagen mejorada
     cv2.namedWindow("Original + Mejorada", cv2.WINDOW_NORMAL)

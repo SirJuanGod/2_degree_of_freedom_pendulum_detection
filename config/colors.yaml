@@ -1,17 +1,17 @@
 colors:
   pivot:
-    hsv_low:  [0, 57, 0] 
-    hsv_high: [50, 255, 255]
+    hsv_low:  [0, 64, 92] 
+    hsv_high: [0, 165, 144]
     bgr_draw: [0, 0, 255]
   joint:
-    hsv_low:  [38, 147, 38]
-    hsv_high: [97, 255, 255]
+    hsv_low:  [49, 35, 12]
+    hsv_high: [73, 255, 194]
     bgr_draw: [0, 255, 0]
   tip:
-    hsv_low:  [108, 99, 0]
-    hsv_high: [147, 255, 255]
+    hsv_low:  [99, 101, 62]
+    hsv_high: [137, 255, 255]
     bgr_draw: [255, 0, 0]
 system:
-  px_per_meter: 500
+  px_per_meter: 2000
   g: 9.81
-  min_pixels: 300
+  min_pixels: 100

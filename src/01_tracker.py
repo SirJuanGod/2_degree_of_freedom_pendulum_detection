@@ -8,12 +8,14 @@ Estrategia por frame:
 
 Esto garantiza detección aunque YOLO no encuadre bien la pegatina.
 
+FORMATOS DE VIDEO SOPORTADOS: .mp4, .mov, .avi, .mkv, .m4v, .webm
+
 GPU OPTIMIZATIONS:
   - Detección automática de GPU (CUDA/Metal/CPU)
   - Warmup YOLO (1 frame dummy) para evitar lag inicial
   - Conversión minimal de tensores (evita .cpu().numpy() en cada frame)
 """
-import cv2, numpy as np, yaml, argparse, warnings
+import cv2, numpy as np, yaml, argparse, warnings, os
 from pathlib import Path
 from ultralytics import YOLO
 
@@ -94,7 +96,19 @@ def find_color_fullframe(frame, lo, hi, min_px):
         return c
     return None
 
+SUPPORTED_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".m4v", ".webm"}
+
 def run(video_path):
+    # ── Validación de formato de video
+    ext = os.path.splitext(str(video_path))[1].lower()
+    if ext not in SUPPORTED_EXTENSIONS:
+        raise ValueError(
+            f"Extensión '{ext}' no soportada. "
+            f"Use uno de: {sorted(SUPPORTED_EXTENSIONS)}"
+        )
+    if not os.path.exists(str(video_path)):
+        raise FileNotFoundError(f"Video no encontrado: {video_path}")
+
     cfg    = load_cfg()
     colors = cfg["colors"]
     min_px = cfg["system"]["min_pixels"]
@@ -102,9 +116,9 @@ def run(video_path):
     # ─────────────────────────────────────────────────
     # Cargar modelo YOLO con GPU detectada
     # ─────────────────────────────────────────────────
-    logger.info(f"Cargando YOLO8n (device={torch_device})...")
+    logger.info(f"Cargando YOLO26n (device={torch_device})...")
     try:
-        model = YOLO("yolov8n.pt")
+        model = YOLO("yolo26n.pt")
         # Calentar modelo (warmup) con 1 frame dummy
         dummy_frame = np.zeros((480, 640, 3), dtype=np.uint8)
         _ = model.track(dummy_frame, persist=True,
@@ -118,22 +132,44 @@ def run(video_path):
         logger.error(f"❌ Error cargando YOLO: {e}")
         raise
     
-    cap   = cv2.VideoCapture(video_path)
+    cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
         logger.error(f"❌ No se puede abrir: {video_path}")
+        if ext == ".mov":
+            logger.error(
+                "  Tip para archivos .mov: asegúrese de tener instalado el codec "
+                "de Apple QuickTime o use ffmpeg para convertir:\n"
+                f"  ffmpeg -i {video_path} -c copy output.mp4"
+            )
         raise FileNotFoundError(f"No se puede abrir: {video_path}")
 
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     W   = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     H   = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-    logger.info(f"[01] {W}x{H} @ {fps:.1f}fps  →  {video_path}")
+    logger.info(f"[01] {W}x{H} @ {fps:.1f}fps  →  {video_path}  (formato: {ext})")
     logger.info(f"[01] Estrategia: YOLO ROI (pase 1) + Full-frame HSV (pase 2)")
 
+    # Intentar codec mp4v; si falla, usar avc1 (más compatible con .mov en Windows)
+    out_path = str(OUT / "video_tracked.mp4")
     writer = cv2.VideoWriter(
-        str(OUT/"video_tracked.mp4"),
-        cv2.VideoWriter_fourcc(*"mp4v"), fps, (W, H) #type: ignore
+        out_path,
+        cv2.VideoWriter_fourcc(*"mp4v"), fps, (W, H)  # type: ignore
     )
+    if not writer.isOpened():
+        logger.warning("⚠  Codec mp4v no disponible, intentando avc1...")
+        writer = cv2.VideoWriter(
+            out_path,
+            cv2.VideoWriter_fourcc(*"avc1"), fps, (W, H)  # type: ignore
+        )
+    if not writer.isOpened():
+        logger.warning("⚠  avc1 tampoco disponible, intentando XVID (.avi)...")
+        out_path = str(OUT / "video_tracked.avi")
+        writer = cv2.VideoWriter(
+            out_path,
+            cv2.VideoWriter_fourcc(*"XVID"), fps, (W, H)  # type: ignore
+        )
+    logger.info(f"[01] Video de salida: {out_path}")
 
 
     traj = {k: [] for k in colors}
